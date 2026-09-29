@@ -3,7 +3,7 @@ using PatternsLab.Problems.Builder;
 using PatternsLab.Problems.Prototype;
 using PatternsLab.Problems.Singleton;
 
-Console.WriteLine("=== SINGLETON: BEFORE ===\n");
+Console.WriteLine("=== SINGLETON: AFTER ===\n");
 
 var db = new DatabaseService();
 var ui = new UiService();
@@ -18,7 +18,7 @@ ui.Render();
 Console.WriteLine($"\nSame config object? {ReferenceEquals(db.Config, ui.Config)}");
 Console.WriteLine($"Times config was loaded from disk: {AppConfig.LoadCount}");
 
-Console.WriteLine("\n=== PROTOTYPE: BEFORE ===\n");
+Console.WriteLine("\n=== PROTOTYPE: AFTER ===\n");
 
 var prototype = new Orc();
 
@@ -58,6 +58,8 @@ copy.Abilities.Add("Fire Breath");
 
 Console.WriteLine(
     $"Original abilities: {string.Join(", ", original.Abilities)}");
-Console.WriteLine("\n=== BUILDER: BEFORE ===\n");
+
+Console.WriteLine("\n=== BUILDER: AFTER ===\n");
+
 Console.WriteLine(RegistrationCallSites.CreateLiveStudentUgly());
 Console.WriteLine(RegistrationCallSites.CreateVideosOnlyUgly());

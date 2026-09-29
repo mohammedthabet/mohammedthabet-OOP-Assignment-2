@@ -97,10 +97,10 @@ Enrollment policy, course communication, and finance formatting have
 different reasons to change.
 
 ### Refactoring
-- `CourseEnrollmentDesk` — manages enrollment and waitlist state.
-- `WelcomePacketWriter` — generates student welcome material.
-- `TuitionInvoiceFormatter` — formats tuition invoice information.
-
+- `SupportTicket` — owns the ticket data and conversation state.
+- `TicketPriorityClassifier` — classifies ticket priority.
+- `SlaPolicy` — calculates SLA deadlines.
+- `TicketMessageFormatter` — formats public and internal support messages.
 ---
 
 ## 6. KitchenTicket
