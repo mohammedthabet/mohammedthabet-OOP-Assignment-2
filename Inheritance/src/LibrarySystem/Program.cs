@@ -3,19 +3,20 @@
 Console.WriteLine("=== LIBRARY SYSTEM ===");
 Console.WriteLine();
 
-// Polymorphism through Person
-List<Person> people =
+// ======================================================
+// 1. POLYMORPHISM - STAFF
+// ======================================================
+
+Console.WriteLine("=== STAFF POLYMORPHISM ===");
+
+List<Staff> staff =
 [
-    new Student(1, "Ali"),
-    new Premium(2, "Sara"),
-    new Librarian(3, "Nora"),
-    new Shelver(4, "Omar"),
-    new HeadLibrarian(5, "Mona")
+    new Librarian(1, "Nora"),
+    new Shelver(2, "Omar"),
+    new HeadLibrarian(3, "Mona")
 ];
 
-Console.WriteLine("People:");
-
-foreach (var person in people)
+foreach (var person in staff)
 {
     Console.WriteLine(
         $"{person.Name} -> {person.GetRole()}");
@@ -23,7 +24,12 @@ foreach (var person in people)
 
 Console.WriteLine();
 
-// Polymorphism through LibraryItem
+// ======================================================
+// 2. POLYMORPHISM - LIBRARY ITEMS
+// ======================================================
+
+Console.WriteLine("=== ITEM POLYMORPHISM ===");
+
 List<LibraryItem> items =
 [
     new Book(1, "Clean Code"),
@@ -31,31 +37,165 @@ List<LibraryItem> items =
     new Magazine(3, "Tech Monthly")
 ];
 
-Console.WriteLine("Library Items:");
-
 foreach (var item in items)
 {
     Console.WriteLine(
-        $"{item.Title} -> loan period: {item.GetLoanPeriodDays()} days");
+        $"{item.Title}: " +
+        $"{item.GetLoanPeriodDays()} days, " +
+        $"late fee = {item.LateFeePerDay:C}/day");
 }
 
 Console.WriteLine();
 
-// Loan relationship
-var student = new Student(10, "Mohamed");
-var book = new Book(20, "C# in Depth");
+// ======================================================
+// 3. WITHDRAWN ITEM
+// ======================================================
 
-var loan = new Loan(
+Console.WriteLine("=== WITHDRAWN ITEM TEST ===");
+
+var student = new Student(10, "Ali");
+var withdrawnBook = new Book(10, "Old Book");
+
+withdrawnBook.Withdraw();
+
+try
+{
+    new Loan(
+        student,
+        withdrawnBook,
+        new DateOnly(2026, 9, 1));
+}
+catch (InvalidOperationException ex)
+{
+    Console.WriteLine($"Blocked: {ex.Message}");
+}
+
+Console.WriteLine();
+
+// ======================================================
+// 4. ITEM ALREADY ON LOAN
+// ======================================================
+
+Console.WriteLine("=== UNAVAILABLE ITEM TEST ===");
+
+var sharedBook = new Book(11, "C# in Depth");
+
+var firstLoan = new Loan(
     student,
-    book,
-    new DateOnly(2026, 9, 29));
+    sharedBook,
+    new DateOnly(2026, 9, 1));
 
-Console.WriteLine("Loan:");
+try
+{
+    var anotherStudent = new Student(11, "Hassan");
+
+    new Loan(
+        anotherStudent,
+        sharedBook,
+        new DateOnly(2026, 9, 2));
+}
+catch (InvalidOperationException ex)
+{
+    Console.WriteLine($"Blocked: {ex.Message}");
+}
+
+Console.WriteLine();
+
+// ======================================================
+// 5. STUDENT BORROW LIMIT
+// ======================================================
+
+Console.WriteLine("=== STUDENT LIMIT TEST ===");
+
+var limitedStudent = new Student(20, "Mohamed");
+
+var loan1 = new Loan(
+    limitedStudent,
+    new Book(20, "Book 1"),
+    new DateOnly(2026, 9, 1));
+
+var loan2 = new Loan(
+    limitedStudent,
+    new Book(21, "Book 2"),
+    new DateOnly(2026, 9, 1));
+
+var loan3 = new Loan(
+    limitedStudent,
+    new Book(22, "Book 3"),
+    new DateOnly(2026, 9, 1));
+
+try
+{
+    var loan4 = new Loan(
+        limitedStudent,
+        new Book(23, "Book 4"),
+        new DateOnly(2026, 9, 1));
+}
+catch (InvalidOperationException ex)
+{
+    Console.WriteLine($"Blocked: {ex.Message}");
+}
+
+Console.WriteLine();
+
+// ======================================================
+// 6. PREMIUM MEMBER + LATE DVD
+// ======================================================
+
+Console.WriteLine("=== PREMIUM LATE FEE TEST ===");
+
+var premium = new Premium(30, "Sara");
+var dvd = new DVD(30, "Design Patterns Course");
+
+var premiumLoan = new Loan(
+    premium,
+    dvd,
+    new DateOnly(2026, 9, 1));
+
+var returnedOn =
+    premiumLoan.DueOn.AddDays(5);
+
+decimal lateFee =
+    premiumLoan.CalculateLateFee(returnedOn);
+
+Console.WriteLine($"Borrowed: {premiumLoan.BorrowedOn}");
+Console.WriteLine($"Due: {premiumLoan.DueOn}");
+Console.WriteLine($"Returned: {returnedOn}");
+Console.WriteLine($"Late fee: {lateFee:C}");
+
+premiumLoan.Return();
+
 Console.WriteLine(
-    $"{loan.Borrower.Name} borrowed {loan.Item.Title}");
+    $"Status after return: {premiumLoan.Status}");
 
-Console.WriteLine($"Status: {loan.Status}");
+Console.WriteLine();
 
-loan.Return();
+// ======================================================
+// 7. INVALID STATE TRANSITIONS
+// ======================================================
 
-Console.WriteLine($"After return: {loan.Status}");
+Console.WriteLine("=== INVALID TRANSITION TESTS ===");
+
+try
+{
+    premiumLoan.Return();
+}
+catch (InvalidOperationException ex)
+{
+    Console.WriteLine(
+        $"Second return blocked: {ex.Message}");
+}
+
+try
+{
+    premiumLoan.MarkLost();
+}
+catch (InvalidOperationException ex)
+{
+    Console.WriteLine(
+        $"Mark returned loan as lost blocked: {ex.Message}");
+}
+
+Console.WriteLine();
+
+Console.WriteLine("=== ALL TESTS COMPLETED ===");
