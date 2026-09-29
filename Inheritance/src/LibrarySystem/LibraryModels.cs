@@ -1,163 +1,446 @@
 ﻿namespace LibrarySystem;
 
-// ======================================================
-// PERSON HIERARCHY
-// ======================================================
 
-public abstract class Person
+// ==================================================
+// PERSON
+// ==================================================
+
+public class Person
 {
-    public int Id { get; }
-    public string Name { get; }
+    public int PersonId { get; }
+    public string FullName { get; }
+    public string Phone { get; }
 
-    protected Person(int id, string name)
+    protected Person(
+        int personId,
+        string fullName,
+        string phone)
     {
-        Id = id;
-        Name = name;
-    }
+        if (personId <= 0)
+            throw new ArgumentException(
+                "Person ID must be greater than zero.");
 
-    public abstract string GetRole();
-}
+        if (string.IsNullOrWhiteSpace(fullName))
+            throw new ArgumentException(
+                "Full name is required.");
 
-public abstract class Member : Person
-{
-    public int MaxBorrowLimit { get; protected set; }
+        if (string.IsNullOrWhiteSpace(phone))
+            throw new ArgumentException(
+                "Phone is required.");
 
-    protected Member(int id, string name, int maxBorrowLimit)
-        : base(id, name)
-    {
-        MaxBorrowLimit = maxBorrowLimit;
-    }
-}
-
-public sealed class Student : Member
-{
-    public Student(int id, string name)
-        : base(id, name, 3)
-    {
-    }
-
-    public override string GetRole() => "Student Member";
-}
-
-public sealed class Premium : Member
-{
-    public Premium(int id, string name)
-        : base(id, name, 10)
-    {
-    }
-
-    public override string GetRole() => "Premium Member";
-}
-
-// ======================================================
-// STAFF HIERARCHY
-// ======================================================
-
-public abstract class Staff : Person
-{
-    protected Staff(int id, string name)
-        : base(id, name)
-    {
+        PersonId = personId;
+        FullName = fullName;
+        Phone = phone;
     }
 }
+
+
+// ==================================================
+// STAFF
+// ==================================================
+
+public class Staff : Person
+{
+    public DateOnly HireDate { get; }
+
+    public decimal MonthlySalary { get; private set; }
+
+    protected decimal ResponsibilityAllowance { get; }
+
+    protected Staff(
+        int personId,
+        string fullName,
+        string phone,
+        DateOnly hireDate,
+        decimal monthlySalary,
+        decimal responsibilityAllowance)
+        : base(personId, fullName, phone)
+    {
+        if (monthlySalary <= 0)
+            throw new ArgumentException(
+                "Monthly salary must be greater than zero.");
+
+        HireDate = hireDate;
+        MonthlySalary = monthlySalary;
+        ResponsibilityAllowance = responsibilityAllowance;
+    }
+
+    public decimal CalculateMonthlyPay()
+    {
+        return MonthlySalary + ResponsibilityAllowance;
+    }
+
+    public void GiveRaise(decimal percentage)
+    {
+        if (percentage <= 0)
+            throw new ArgumentException(
+                "Raise percentage must be greater than zero.");
+
+        MonthlySalary +=
+            MonthlySalary * percentage / 100m;
+    }
+}
+
 
 public sealed class Librarian : Staff
 {
-    public Librarian(int id, string name)
-        : base(id, name)
+    public Librarian(
+        int personId,
+        string fullName,
+        string phone,
+        DateOnly hireDate,
+        decimal monthlySalary)
+        : base(
+            personId,
+            fullName,
+            phone,
+            hireDate,
+            monthlySalary,
+            0m)
     {
     }
-
-    public override string GetRole() => "Librarian";
 }
+
 
 public sealed class Shelver : Staff
 {
-    public Shelver(int id, string name)
-        : base(id, name)
+    public string Section { get; private set; }
+
+    public Shelver(
+        int personId,
+        string fullName,
+        string phone,
+        DateOnly hireDate,
+        decimal monthlySalary,
+        string section)
+        : base(
+            personId,
+            fullName,
+            phone,
+            hireDate,
+            monthlySalary,
+            0m)
     {
+        if (string.IsNullOrWhiteSpace(section))
+            throw new ArgumentException(
+                "Section is required.");
+
+        Section = section;
     }
 
-    public override string GetRole() => "Shelver";
+    public void Reassign(string newSection)
+    {
+        if (string.IsNullOrWhiteSpace(newSection))
+            throw new ArgumentException(
+                "Section is required.");
+
+        Section = newSection;
+    }
 }
+
 
 public sealed class HeadLibrarian : Staff
 {
-    public HeadLibrarian(int id, string name)
-        : base(id, name)
+    public HeadLibrarian(
+        int personId,
+        string fullName,
+        string phone,
+        DateOnly hireDate,
+        decimal monthlySalary)
+        : base(
+            personId,
+            fullName,
+            phone,
+            hireDate,
+            monthlySalary,
+            400m)
+    {
+    }
+}
+
+
+// ==================================================
+// MEMBER
+// ==================================================
+
+public class Member : Person
+{
+    private readonly List<Loan> _loans = new();
+
+    public IReadOnlyList<Loan> Loans => _loans;
+
+    public int MaxBorrowLimit { get; }
+
+    public decimal LateFeeDiscountPercentage { get; }
+
+    protected Member(
+        int personId,
+        string fullName,
+        string phone,
+        int maxBorrowLimit,
+        decimal lateFeeDiscountPercentage)
+        : base(personId, fullName, phone)
+    {
+        if (maxBorrowLimit <= 0)
+            throw new ArgumentException(
+                "Borrow limit must be greater than zero.");
+
+        if (lateFeeDiscountPercentage < 0 ||
+            lateFeeDiscountPercentage > 100)
+        {
+            throw new ArgumentException(
+                "Late fee discount must be between 0 and 100.");
+        }
+
+        MaxBorrowLimit = maxBorrowLimit;
+        LateFeeDiscountPercentage =
+            lateFeeDiscountPercentage;
+    }
+
+    public Loan Borrow(
+        int loanId,
+        LibraryItem item,
+        DateOnly borrowedOn)
+    {
+        if (item.IsWithdrawn)
+            throw new InvalidOperationException(
+                "Cannot borrow a withdrawn item.");
+
+        if (item.IsOnLoan)
+            throw new InvalidOperationException(
+                "Cannot borrow an item that is already on loan.");
+
+        int activeLoans = 0;
+
+        foreach (Loan loan in _loans)
+        {
+            if (loan.Status == LoanStatus.Borrowed)
+                activeLoans++;
+        }
+
+        if (activeLoans >= MaxBorrowLimit)
+            throw new InvalidOperationException(
+                $"{FullName} reached the borrowing limit.");
+
+        Loan newLoan = new Loan(
+            loanId,
+            this,
+            item,
+            borrowedOn);
+
+        _loans.Add(newLoan);
+
+        item.MarkAsOnLoan();
+
+        return newLoan;
+    }
+}
+
+
+public sealed class Student : Member
+{
+    public Student(
+        int personId,
+        string fullName,
+        string phone)
+        : base(
+            personId,
+            fullName,
+            phone,
+            3,
+            0m)
+    {
+    }
+}
+
+
+public sealed class Premium : Member
+{
+    public Premium(
+        int personId,
+        string fullName,
+        string phone)
+        : base(
+            personId,
+            fullName,
+            phone,
+            10,
+            20m)
     {
     }
 
-    public override string GetRole() => "Head Librarian";
+    // Computed property:
+    // We do not store ReadingPoints.
+    // They are calculated from the loan history.
+    public int ReadingPoints
+    {
+        get
+        {
+            int returnedLoans = 0;
+
+            foreach (Loan loan in Loans)
+            {
+                if (loan.Status == LoanStatus.Returned)
+                    returnedLoans++;
+            }
+
+            return returnedLoans * 5;
+        }
+    }
 }
 
-// ======================================================
-// LIBRARY ITEM HIERARCHY
-// ======================================================
 
-public abstract class LibraryItem
+// ==================================================
+// LIBRARY ITEM
+// ==================================================
+
+public class LibraryItem
 {
-    public int Id { get; }
+    public string CatalogNumber { get; }
     public string Title { get; }
 
-    public bool IsWithdrawn { get; private set; }
-    public bool IsAvailable { get; internal set; } = true;
+    public int LoanPeriodDays { get; }
 
-    protected LibraryItem(int id, string title)
+    // Can only be changed from inside LibraryItem.
+    public decimal BaseLateFee { get; private set; }
+
+    public bool IsOnLoan { get; private set; }
+    public bool IsWithdrawn { get; private set; }
+
+    // Each child sends its multiplier through base(...).
+    protected decimal LateFeeMultiplier { get; }
+
+    protected LibraryItem(
+        string catalogNumber,
+        string title,
+        int loanPeriodDays,
+        decimal baseLateFee,
+        decimal lateFeeMultiplier)
     {
-        Id = id;
+        if (string.IsNullOrWhiteSpace(catalogNumber))
+            throw new ArgumentException(
+                "Catalog number is required.");
+
+        if (string.IsNullOrWhiteSpace(title))
+            throw new ArgumentException(
+                "Title is required.");
+
+        if (loanPeriodDays <= 0)
+            throw new ArgumentException(
+                "Loan period must be greater than zero.");
+
+        if (baseLateFee <= 0)
+            throw new ArgumentException(
+                "Late fee must be greater than zero.");
+
+        if (lateFeeMultiplier <= 0)
+            throw new ArgumentException(
+                "Late fee multiplier must be greater than zero.");
+
+        CatalogNumber = catalogNumber;
         Title = title;
+        LoanPeriodDays = loanPeriodDays;
+        BaseLateFee = baseLateFee;
+        LateFeeMultiplier = lateFeeMultiplier;
+    }
+
+    // One calculation works for Book, DVD and Magazine.
+    // No if/switch based on item type.
+    public decimal CalculateDailyLateFee()
+    {
+        return BaseLateFee * LateFeeMultiplier;
+    }
+
+    // Dedicated pricing method.
+    public void ChangeBaseLateFee(decimal newFee)
+    {
+        if (newFee <= 0)
+            throw new ArgumentException(
+                "Late fee must be greater than zero.");
+
+        BaseLateFee = newFee;
     }
 
     public void Withdraw()
     {
+        if (IsOnLoan)
+            throw new InvalidOperationException(
+                "Cannot withdraw an item that is currently on loan.");
+
         IsWithdrawn = true;
     }
 
-    public abstract int GetLoanPeriodDays();
+    public void Restore()
+    {
+        IsWithdrawn = false;
+    }
 
-    public abstract decimal LateFeePerDay { get; }
+    internal void MarkAsOnLoan()
+    {
+        IsOnLoan = true;
+    }
+
+    internal void MarkAsReturned()
+    {
+        IsOnLoan = false;
+    }
 }
+
 
 public sealed class Book : LibraryItem
 {
-    public Book(int id, string title)
-        : base(id, title)
+    public Book(
+        string catalogNumber,
+        string title,
+        decimal baseLateFee)
+        : base(
+            catalogNumber,
+            title,
+            21,
+            baseLateFee,
+            1m)
     {
     }
-
-    public override int GetLoanPeriodDays() => 14;
-
-    public override decimal LateFeePerDay => 1m;
 }
+
 
 public sealed class DVD : LibraryItem
 {
-    public DVD(int id, string title)
-        : base(id, title)
+    public DVD(
+        string catalogNumber,
+        string title,
+        decimal baseLateFee)
+        : base(
+            catalogNumber,
+            title,
+            7,
+            baseLateFee,
+            2m)
     {
     }
-
-    public override int GetLoanPeriodDays() => 7;
-
-    public override decimal LateFeePerDay => 2m;
 }
+
 
 public sealed class Magazine : LibraryItem
 {
-    public Magazine(int id, string title)
-        : base(id, title)
+    public Magazine(
+        string catalogNumber,
+        string title,
+        decimal baseLateFee)
+        : base(
+            catalogNumber,
+            title,
+            3,
+            baseLateFee,
+            0.5m)
     {
     }
-
-    public override int GetLoanPeriodDays() => 3;
-
-    public override decimal LateFeePerDay => 0.5m;
 }
 
-// ======================================================
+
+// ==================================================
 // LOAN
-// ======================================================
+// ==================================================
 
 public enum LoanStatus
 {
@@ -166,85 +449,88 @@ public enum LoanStatus
     Lost
 }
 
+
 public sealed class Loan
 {
-    private static readonly List<Loan> AllLoans = new();
+    public int LoanId { get; }
 
     public Member Borrower { get; }
+
     public LibraryItem Item { get; }
 
-    public DateOnly BorrowedOn { get; }
-    public DateOnly DueOn { get; }
+    public DateOnly BorrowDate { get; }
+
+    public DateOnly DueDate { get; }
+
+    public DateOnly? ReturnDate { get; private set; }
 
     public LoanStatus Status { get; private set; }
 
     public Loan(
+        int loanId,
         Member borrower,
         LibraryItem item,
-        DateOnly borrowedOn)
+        DateOnly borrowDate)
     {
-        if (item.IsWithdrawn)
-            throw new InvalidOperationException(
-                "Cannot borrow a withdrawn item.");
+        if (loanId <= 0)
+            throw new ArgumentException(
+                "Loan ID must be greater than zero.");
 
-        if (!item.IsAvailable)
-            throw new InvalidOperationException(
-                "Cannot borrow an unavailable item.");
-
-        int activeLoans = AllLoans.Count(
-            loan =>
-                loan.Borrower == borrower &&
-                loan.Status == LoanStatus.Borrowed);
-
-        if (activeLoans >= borrower.MaxBorrowLimit)
-            throw new InvalidOperationException(
-                $"{borrower.Name} reached the borrowing limit.");
-
+        LoanId = loanId;
         Borrower = borrower;
         Item = item;
-        BorrowedOn = borrowedOn;
+        BorrowDate = borrowDate;
 
-        DueOn = borrowedOn.AddDays(
-            item.GetLoanPeriodDays());
+        DueDate =
+            borrowDate.AddDays(item.LoanPeriodDays);
 
         Status = LoanStatus.Borrowed;
-
-        item.IsAvailable = false;
-
-        AllLoans.Add(this);
     }
 
-    public void Return()
-    {
-        EnsureBorrowed();
-
-        Status = LoanStatus.Returned;
-        Item.IsAvailable = true;
-    }
-
-    public void MarkLost()
-    {
-        EnsureBorrowed();
-
-        Status = LoanStatus.Lost;
-        Item.IsAvailable = false;
-    }
-
-    public decimal CalculateLateFee(DateOnly returnedOn)
-    {
-        if (returnedOn <= DueOn)
-            return 0m;
-
-        int lateDays =
-            returnedOn.DayNumber - DueOn.DayNumber;
-
-        return lateDays * Item.LateFeePerDay;
-    }
-
-    private void EnsureBorrowed()
+    public decimal Return(DateOnly returnDate)
     {
         if (Status != LoanStatus.Borrowed)
             throw new InvalidOperationException(
                 "Loan is no longer active.");
+
+        if (returnDate < BorrowDate)
+            throw new InvalidOperationException(
+                "Return date cannot be before borrow date.");
+
+        ReturnDate = returnDate;
+
+        int lateDays =
+            returnDate.DayNumber - DueDate.DayNumber;
+
+        if (lateDays < 0)
+            lateDays = 0;
+
+        // Ask the item for its daily late fee.
+        decimal fee =
+            lateDays * Item.CalculateDailyLateFee();
+
+        decimal discount =
+            fee *
+            Borrower.LateFeeDiscountPercentage /
+            100m;
+
+        fee -= discount;
+
+        Status = LoanStatus.Returned;
+
+        Item.MarkAsReturned();
+
+        return fee;
+    }
+
+    public void MarkLost()
+    {
+        if (Status != LoanStatus.Borrowed)
+            throw new InvalidOperationException(
+                "Loan is no longer active.");
+
+        Status = LoanStatus.Lost;
+
+        Item.MarkAsReturned();
     }
 }
